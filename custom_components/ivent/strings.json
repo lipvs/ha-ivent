@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "i-Vent Cloud povezava",
+        "description": "Vnesi API kljuc in Location ID iz cloud.i-vent.com. IP naslov naprave je opcijski (za lokalne senzorje).",
+        "data": {
+          "api_key": "API kljuc",
+          "location_id": "Location ID",
+          "host": "IP naslov naprave (opcijsko)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Ni mozno vzpostaviti povezave z i-Vent oblakom",
+      "no_groups": "Nobena skupina z napravami ni bila najdena",
+      "invalid_location_id": "Location ID mora biti stevilo",
+      "unknown": "Neznana napaka"
+    },
+    "abort": {
+      "already_configured": "Ta lokacija je ze konfigurirana"
+    }
+  }
+}

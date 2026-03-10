@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "i-Vent Cloud Connection",
+        "description": "Enter your API key and Location ID from cloud.i-vent.com. Device IP is optional (for local sensors).",
+        "data": {
+          "api_key": "API Key",
+          "location_id": "Location ID",
+          "host": "Device IP address (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to i-Vent cloud",
+      "no_groups": "No groups with devices found",
+      "invalid_location_id": "Location ID must be a number",
+      "unknown": "Unknown error"
+    },
+    "abort": {
+      "already_configured": "This location is already configured"
+    }
+  }
+}
