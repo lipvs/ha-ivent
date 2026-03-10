@@ -1,8 +1,6 @@
 # i-Vent Rekuperator — Home Assistant Integration
 
-Custom integration for [i-Vent](https://i-vent.com/) heat recovery ventilation units via **local UDP protocol** (no cloud dependency).
-
-> **Status:** Read-only (sensors + state) working. Control commands (set temperature, mode, fan) acknowledged by device but not yet applied — protocol reverse-engineering in progress.
+Custom HACS integration for [i-Vent](https://i-vent.com/) heat recovery ventilation units via local network — **no cloud dependency**.
 
 ## Screenshots
 
@@ -36,7 +34,37 @@ Custom integration for [i-Vent](https://i-vent.com/) heat recovery ventilation u
 
 *Fan speed control: Low, Medium, High, Boost*
 
+## Why This Is Useful
+
+i-Vent recuperators have no official Home Assistant integration or public API. This integration exposes your ventilation system to HA, enabling:
+
+- **Temperature monitoring** — track supply and exhaust duct temperatures per room
+- **Humidity tracking** — monitor indoor humidity levels from each unit
+- **Climate cards** — control HVAC mode (recovery, ventilation, off) from your HA dashboard
+- **Fan speed control** — set fan speed (low, medium, high, boost) per unit
+- **Automations** — turn on boost ventilation when cooking, switch to night mode at bedtime, lower fan when nobody's home, trigger ventilation based on humidity thresholds
+- **Multi-unit visibility** — see all recuperators in one dashboard instead of checking each room in the i-Vent app
+
+## Installation
+
+### HACS (Manual Repository)
+
+1. In HACS, go to Integrations → ⋮ → Custom Repositories
+2. Add this repository URL, category: Integration
+3. Install "i-Vent Rekuperator"
+4. Restart Home Assistant
+5. Go to Settings → Devices & Services → Add Integration → i-Vent
+6. Enter device IP and session token
+
+### Manual
+
+1. Copy `custom_components/ivent/` to your HA `config/custom_components/` directory
+2. Restart Home Assistant
+3. Add integration via Settings → Devices & Services
+
 ## Entities
+
+Each i-Vent unit creates the following entities:
 
 | Platform | Entity | Description |
 |----------|--------|-------------|
@@ -47,98 +75,19 @@ Custom integration for [i-Vent](https://i-vent.com/) heat recovery ventilation u
 | `sensor` | Vlažnost | Humidity (%) |
 | `sensor` | Filter | Filter status |
 
-## Protocol
+## Current Status
 
-This integration communicates with i-Vent units over **UDP port 1028** using a raw **protobuf** wire format (not standard gRPC/HTTP).
+**Read-only sensors are fully working.** The integration polls each unit and exposes real-time temperature, humidity, fan state, and HVAC mode.
 
-### Key Details
+**Control commands are not yet functional.** The device acknowledges control packets but does not apply the changes. Further protocol analysis is needed — see Roadmap below.
 
-- **Transport:** UDP, source port **must** be 1028
-- **Encoding:** Raw protobuf (varint, fixed32, fixed64, length-delimited)
-- **Discovery:** Message type 257 → returns device info + sensor data
-- **Control:** Message type 4370 (MSG_SCHEDULE) → sets mode, setpoint, fan
-- **Toggle:** Message type 4358 (MSG_DEVICE_STATE) → on/off
-- **Session token:** Permanent, obtained during initial pairing
-- **Multi-device:** Multiple units can share a single IP (WiFi bridge) via different session tokens
+## Roadmap
 
-### Sensor Field Mapping (discovery response → f65.f10)
-
-| Field | Type | Description |
-|-------|------|-------------|
-| f1 | varint | Exhaust/extract duct temp (°C) |
-| f2 | varint | Supply duct temp (°C) |
-| f3 | varint | Humidity (%) |
-| f7 | varint | Mode (4=recovery) |
-| f8 | varint | Fan level (5=boost) |
-| f10 | varint | Temperature setpoint (16-33°C) |
-| f12 | varint | Fan % (live) |
-
-### Control Protocol (MSG_SCHEDULE 4370)
-
-Sends 6 packets per command: 3 persistent nonce slots × 2 directions (extract + supply).
-
-```
-f88 {
-  f1 = schedule_nonce (fixed32)
-  f8 {
-    f1 = mode (0=ventilation, 2=recovery)
-    f2 = setpoint
-    f3 = direction (1=supply, 2=extract)
-    f4 = fan_level (1-2)
-    f5 = sub_mode
-    f6 = start_timestamp
-    f7 = end_timestamp
-    f8 = 65
-    f9 = 65
-  }
-  f99 = 258 (fixed64)
-}
-```
-
-## Installation
-
-### HACS (Manual)
-
-1. Copy `custom_components/ivent/` to your HA `config/custom_components/` directory
-2. Restart Home Assistant
-3. Go to Settings → Devices & Services → Add Integration → i-Vent
-4. Enter device IP and session token
-
-### Deployment (development)
-
-```bash
-# From this repo root — do NOT use scp -r (creates nested dirs)
-scp hacs-ivent/custom_components/ivent/*.py *.json *.yaml root@<HA_IP>:/config/custom_components/ivent/
-
-# Clean bytecode cache and restart
-ssh root@<HA_IP> "rm -rf /config/custom_components/ivent/__pycache__/ && ha core restart"
-```
-
-## Project Structure
-
-```
-custom_components/ivent/
-├── __init__.py          # Integration setup + platform loading
-├── api.py               # UDP client, protobuf codec, control commands
-├── climate.py           # Climate entity (HVAC mode, target temp, presets)
-├── config_flow.py       # UI configuration flow
-├── const.py             # Constants (ports, message types, field IDs)
-├── coordinator.py       # DataUpdateCoordinator (polling via discovery)
-├── fan.py               # Fan entity (speed control)
-├── manifest.json        # Integration manifest (local_polling)
-├── proto.py             # Raw protobuf encoder/decoder
-├── sensor.py            # Temperature, humidity, filter sensors
-├── strings.json         # UI strings
-└── translations/
-    └── en.json          # English translations
-```
-
-## Known Limitations
-
-- **Control commands:** Device acknowledges packets (47-byte ACK, msg type 33279) but does not apply settings changes. Needs further PCAP analysis with confirmed state changes from the native app.
-- **Single device:** Currently only tested with 1 unit ("Kabinet" on 192.168.1.164). Multi-device support is structurally ready but untested.
-- **No outdoor/indoor temp:** Fields f4-f6 in sensor data are dynamic differentials, not direct temperature readings. Removed from entities.
-- **No CO2 sensor:** Requires i-Qube hardware module, field mapping unknown.
+- [ ] **Control commands** — reverse-engineer the full control protocol so HA can set mode, fan speed, and target temperature
+- [ ] **Multi-device testing** — the integration supports multiple units structurally, but only one unit has been tested so far
+- [ ] **CO2 sensor** — requires i-Qube hardware module; field mapping unknown
+- [ ] **Outdoor/indoor temperature** — sensor fields exist but contain computed differentials, not direct readings; needs further analysis
+- [ ] **HACS default repository** — submit to HACS default repo once control is stable
 
 ## License
 
